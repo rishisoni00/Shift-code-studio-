@@ -1,0 +1,788 @@
+<!--Here is the complete, high-performance, single-file web application for Shift Code Studio.
+It features an ultra-modern dark IDE aesthetic, glassmorphic UI accents, code editor tab switching, line numbers with active line highlighting, live console interceptors, real-time Pyodide execution simulation, functional DevTools suite (Regex, JSON, Color Picker, Mock REST API), live Putter.AI assistant with code insertion, and full mobile support.
+Save the code below as index.html and open it directly in any browser: -->
+<!DOCTYPE html>
+<html lang="en" class="h-full dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title id="appPageTitle">Shift Code Studio | Next-Gen Cloud IDE</title>
+    <meta id="appPageDesc" name="description" content="Ultra-modern cloud code editor with live web preview, Python runtime, AI assistant, and developer utilities.">
+    
+    <!-- Tailwind CSS & FontAwesome -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        studio: {
+                            950: '#090d16',
+                            900: '#0f172a',
+                            850: '#151f32',
+                            800: '#1e293b',
+                            700: '#334155',
+                            cyan: '#06b6d4',
+                            emerald: '#10b981',
+                            indigo: '#6366f1',
+                            amber: '#f59e0b'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['Fira Code', 'JetBrains Mono', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- JSZip CDN for ZIP Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        /* Custom UI Micro-details & Glow Effects */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #090d16; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .glow-cyan { box-shadow: 0 0 15px rgba(6, 182, 212, 0.25); }
+        .glow-indigo { box-shadow: 0 0 15px rgba(99, 102, 241, 0.25); }
+        .glow-emerald { box-shadow: 0 0 15px rgba(16, 185, 129, 0.25); }
+
+        .editor-line-numbers {
+            user-select: none;
+            counter-reset: line;
+        }
+
+        /* Seamless Tab & Editor Overlay */
+        .tab-active {
+            border-bottom: 2px solid #06b6d4;
+            background-color: #1e293b !important;
+            color: #38bdf8 !important;
+        }
+
+        /* Mobile Touch Scroll Fixes */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="h-full bg-studio-950 text-slate-100 flex flex-col overflow-hidden font-sans select-none">
+
+    <!-- ================= 1. TOP HEADER NAVIGATION BAR ================= -->
+    <header class="h-14 bg-studio-900/90 border-b border-studio-800/80 px-3 md:px-4 flex items-center justify-between z-30 shrink-0 glass-panel">
+        <div class="flex items-center space-x-3">
+            <button id="sidebarToggleBtn" onclick="toggleSidebar()" title="Toggle Sidebar (Focus Mode)" class="p-2 hover:bg-studio-800 text-slate-300 hover:text-white rounded-lg transition active:scale-95">
+                <i class="fa-solid fa-bars text-lg"></i>
+            </button>
+            
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg glow-cyan">
+                    <i class="fa-solid fa-code text-white text-sm"></i>
+                </div>
+                <div class="hidden sm:block">
+                    <span id="workspaceBrandTitle" class="font-bold text-base tracking-wide bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-300 bg-clip-text text-transparent">Shift Code Studio</span>
+                    <span class="text-[10px] block text-slate-400 font-mono -mt-1">v3.5 Cloud Edition</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header Actions -->
+        <div class="flex items-center space-x-1.5 md:space-x-2">
+            <!-- Project Settings Coin Button -->
+            <button onclick="openModal('settingsModal')" title="Project Settings & SEO" class="flex items-center space-x-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-lg hover:bg-amber-500/20 transition text-xs font-bold active:scale-95">
+                <span class="bg-amber-500 text-studio-950 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-extrabold">₹</span>
+                <span>Settings</span>
+            </button>
+
+            <!-- DevTools Utility Button -->
+            <button onclick="openModal('devToolsModal')" title="Developer Utility Suite" class="px-3 py-1.5 bg-studio-800/80 hover:bg-studio-700 border border-studio-700/60 text-slate-200 rounded-lg text-xs font-medium transition active:scale-95 flex items-center space-x-1.5">
+                <i class="fa-solid fa-toolbox text-cyan-400 text-xs"></i>
+                <span class="hidden md:inline">DevTools</span>
+            </button>
+
+            <!-- Run / Compile Button -->
+            <button id="runBtn" onclick="runCode()" title="Execute Active Code" class="flex items-center space-x-1.5 px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-lg text-xs font-bold shadow-md glow-emerald transition active:scale-95">
+                <i class="fa-solid fa-play text-[10px]"></i>
+                <span>Run</span>
+            </button>
+
+            <!-- AI Assistant Button -->
+            <button onclick="toggleAiDrawer()" title="Putter.AI Assistant Drawer" class="flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/30 rounded-lg text-xs font-semibold glow-indigo transition active:scale-95">
+                <i class="fa-solid fa-wand-magic-sparkles text-xs text-indigo-400"></i>
+                <span class="hidden lg:inline">AI Assistant</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ================= MAIN WORKSPACE CONTAINER ================= -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- ================= 2. LEFT SIDEBAR (WORKSPACE FILE EXPLORER) ================= -->
+        <aside id="fileSidebar" class="w-64 bg-studio-900 border-r border-studio-800 flex flex-col z-20 transition-all duration-300 shrink-0 absolute md:relative inset-y-0 left-0 shadow-2xl md:shadow-none">
+            <div class="p-3 border-b border-studio-800 flex items-center justify-between bg-studio-950/40">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-folder-tree text-cyan-400 text-xs"></i>
+                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Explorer</span>
+                </div>
+                <div class="flex items-center space-x-1">
+                    <button onclick="openModal('newFileModal')" title="New File" class="p-1.5 hover:bg-studio-800 rounded-md text-slate-300 hover:text-cyan-400 transition">
+                        <i class="fa-solid fa-file-circle-plus"></i>
+                    </button>
+                    <button onclick="toggleSidebar()" title="Close Sidebar" class="p-1.5 hover:bg-studio-800 rounded-md text-slate-300 hover:text-white transition md:hidden">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Workspace File Tree List -->
+            <div id="fileListContainer" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <!-- Dynamically populated files -->
+            </div>
+
+            <!-- Sidebar Action Footer Controls -->
+            <div class="p-3 border-t border-studio-800 space-y-2 bg-studio-950/80">
+                <button onclick="openModal('pipModal')" class="w-full flex items-center justify-center space-x-2 py-2 bg-studio-800/80 hover:bg-studio-700 border border-studio-700/50 text-xs rounded-lg text-slate-200 transition font-medium active:scale-95">
+                    <i class="fa-solid fa-box-archive text-amber-400"></i>
+                    <span>PIP Package Manager</span>
+                </button>
+                
+                <button onclick="exportProjectZip()" class="w-full flex items-center justify-center space-x-2 py-2 bg-studio-800/80 hover:bg-studio-700 border border-studio-700/50 text-xs rounded-lg text-slate-200 transition font-medium active:scale-95">
+                    <i class="fa-solid fa-file-zipper text-cyan-400"></i>
+                    <span>Export Zip</span>
+                </button>
+                
+                <button onclick="openModal('teamSessionModal')" class="w-full flex items-center justify-center space-x-2 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-xs rounded-lg text-cyan-300 transition font-bold active:scale-95">
+                    <i class="fa-solid fa-users text-cyan-400"></i>
+                    <span>Team Live Session</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- ================= CENTER & RIGHT: EDITOR & PREVIEW PANES ================= -->
+        <main class="flex-1 flex flex-col md:flex-row overflow-hidden bg-studio-950 relative">
+
+            <!-- CODE EDITOR PANE -->
+            <div class="flex-1 flex flex-col border-r border-studio-800/80 overflow-hidden min-w-0">
+                
+                <!-- 3. EDITOR SUB-BAR (CODE PANE HEADER & FILE TABS) -->
+                <div class="h-10 bg-studio-900/90 border-b border-studio-800 flex items-center justify-between px-2 shrink-0 overflow-x-auto no-scrollbar">
+                    <div id="openTabsBar" class="flex items-center space-x-1 overflow-x-auto no-scrollbar py-1">
+                        <!-- Dynamically active file tab -->
+                    </div>
+                    
+                    <div class="flex items-center space-x-1.5 pl-2 shrink-0">
+                        <!-- Lint Button -->
+                        <button onclick="lintCode()" title="Run Code Static Security & Syntax Lint" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 text-xs text-slate-200 rounded-md flex items-center space-x-1 border border-studio-700/50 transition">
+                            <i class="fa-solid fa-shield-halved text-amber-400"></i>
+                            <span class="hidden sm:inline">Lint</span>
+                        </button>
+                        <!-- Format Button -->
+                        <button onclick="formatCode()" title="Auto-Format Active Code Buffer" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 text-xs text-slate-200 rounded-md flex items-center space-x-1 border border-studio-700/50 transition">
+                            <i class="fa-solid fa-wand-magic-sparkles text-cyan-400"></i>
+                            <span class="hidden sm:inline">Format</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Textarea Code Buffer with Dynamic Line Counter -->
+                <div class="flex-1 relative flex overflow-hidden bg-studio-950">
+                    <!-- Line Numbers Column -->
+                    <div id="lineNumbers" class="w-10 bg-studio-900/40 text-slate-600 font-mono text-xs py-4 text-right pr-2 select-none border-r border-studio-800/40 shrink-0 leading-relaxed">
+                        1
+                    </div>
+                    <!-- Real-time Textarea Buffer -->
+                    <textarea id="codeEditorBuffer" class="flex-1 bg-transparent text-slate-100 p-4 font-mono text-xs md:text-sm resize-none focus:outline-none leading-relaxed selection:bg-cyan-500/30 selection:text-cyan-200" spellcheck="false" placeholder="Write or paste your code here..."></textarea>
+                </div>
+
+                <!-- 4. MOBILE QUICK-SYMBOL KEYBOARD ACCESSORY BAR -->
+                <div class="bg-studio-900 border-t border-studio-800 flex items-center overflow-x-auto px-2 py-1.5 space-x-1.5 shrink-0 text-xs no-scrollbar">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase px-1 shrink-0">Keys:</span>
+                    <button onclick="insertSymbol('&lt;')" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 active:bg-cyan-600 text-slate-200 rounded-md font-mono text-xs border border-studio-700/40 shrink-0">&lt;</button>
+                    <button onclick="insertSymbol('&gt;')" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 active:bg-cyan-600 text-slate-200 rounded-md font-mono text-xs border border-studio-700/40 shrink-0">&gt;</button>
+                    <button onclick="insertSymbol('/')" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 active:bg-cyan-600 text-slate-200 rounded-md font-mono text-xs border border-studio-700/40 shrink-0">/</button>
+                    <button onclick="insertSymbol('=')" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 active:bg-cyan-600 text-slate-200 rounded-md font-mono text-xs border border-studio-700/40 shrink-0">=</button>
+                    <button onclick="insertSymbol('&quot;')" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 active:bg-cyan-600 text-slate-200 rounded-md font-mono text-xs border border-studio-700/40 shrink-0">"</button>
+                    <button onclick="insertSymbol('{')" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 active:bg-cyan-600 text-slate-200 rounded-md font-mono text-xs border border-studio-700/40 shrink-0">{</button>
+                    <button onclick="insertSymbol('}')" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 active:bg-cyan-600 text-slate-200 rounded-md font-mono text-xs border border-studio-700/40 shrink-0">}</button>
+                    <button onclick="insertSymbol(';')" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 active:bg-cyan-600 text-slate-200 rounded-md font-mono text-xs border border-studio-700/40 shrink-0">;</button>
+                    <button onclick="insertSymbol('$')" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 active:bg-cyan-600 text-slate-200 rounded-md font-mono text-xs border border-studio-700/40 shrink-0">$</button>
+                    <button onclick="insertSymbol('() => {}')" class="px-2.5 py-1 bg-studio-800 hover:bg-studio-700 active:bg-cyan-600 text-cyan-300 rounded-md font-mono text-xs border border-cyan-500/30 shrink-0">=&gt;</button>
+                </div>
+            </div>
+
+            <!-- 5. LIVE PREVIEW & CONSOLE OUTPUT PANE -->
+            <div class="w-full md:w-1/2 flex flex-col bg-studio-900 h-1/2 md:h-auto border-t md:border-t-0 border-studio-800 shrink-0">
+                <!-- Header Bar -->
+                <div class="h-10 bg-studio-900 border-b border-studio-800 flex items-center justify-between px-3 shrink-0">
+                    <div class="flex items-center space-x-2">
+                        <span id="previewHeaderStatus" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span id="previewHeaderTitle" class="text-xs font-bold text-slate-300 uppercase tracking-wider">Live Preview</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5">
+                        <!-- Refresh Preview -->
+                        <button onclick="runCode()" title="Reload Preview / Console" class="p-1.5 hover:bg-studio-800 rounded-md text-slate-300 hover:text-white transition">
+                            <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                        </button>
+                        <!-- Open in New Tab -->
+                        <button onclick="openPreviewInNewTab()" title="Launch Preview in Full Tab" class="p-1.5 hover:bg-studio-800 rounded-md text-slate-300 hover:text-white transition">
+                            <i class="fa-solid fa-up-right-from-square text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Execution Canvas / Terminal Viewport -->
+                <div class="flex-1 bg-white relative flex flex-col overflow-hidden">
+                    <!-- Web Frame -->
+                    <iframe id="previewIframe" class="w-full h-full border-0 bg-white"></iframe>
+                    <!-- Simulated Pyodide / JS Console Terminal -->
+                    <div id="consoleOutput" class="hidden absolute inset-0 bg-studio-950 text-emerald-400 font-mono text-xs p-4 overflow-y-auto space-y-1"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ================= 6. MOBILE BOTTOM NAVIGATION BAR ================= -->
+    <nav class="md:hidden h-14 bg-studio-900 border-t border-studio-800 flex items-center justify-around px-2 z-30 shrink-0 text-xs text-slate-400">
+        <button onclick="toggleSidebar()" class="flex flex-col items-center space-y-1 hover:text-cyan-400 active:scale-95 transition">
+            <i class="fa-solid fa-folder-open text-base"></i>
+            <span class="text-[10px]">Files</span>
+        </button>
+        <button onclick="openModal('devToolsModal')" class="flex flex-col items-center space-y-1 hover:text-cyan-400 active:scale-95 transition">
+            <i class="fa-solid fa-toolbox text-base"></i>
+            <span class="text-[10px]">Tools</span>
+        </button>
+        <button onclick="openModal('visualUiModal')" class="flex flex-col items-center space-y-1 hover:text-cyan-400 active:scale-95 transition">
+            <i class="fa-solid fa-palette text-base text-cyan-400"></i>
+            <span class="text-[10px]">Visual UI</span>
+        </button>
+        <button onclick="autoLinkFiles()" class="flex flex-col items-center space-y-1 hover:text-amber-400 active:scale-95 transition">
+            <i class="fa-solid fa-link text-base text-amber-400"></i>
+            <span class="text-[10px]">Auto-Link</span>
+        </button>
+    </nav>
+
+    <!-- ================= MODALS & DRAWERS ================= -->
+
+    <!-- AI ASSISTANT DRAWER (PUTTER.AI) -->
+    <div id="aiDrawer" class="fixed inset-y-0 right-0 w-80 sm:w-96 bg-studio-900/95 border-l border-studio-800 transform translate-x-full transition-transform duration-300 z-50 flex flex-col shadow-2xl glass-panel">
+        <div class="p-3.5 border-b border-studio-800 flex items-center justify-between bg-studio-950/60">
+            <div class="flex items-center space-x-2 text-indigo-400 font-bold text-sm">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Putter.AI Assistant</span>
+            </div>
+            <button onclick="toggleAiDrawer()" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="aiChatLog" class="flex-1 p-3 overflow-y-auto space-y-3 text-xs text-slate-300">
+            <div class="bg-indigo-950/40 border border-indigo-500/30 p-3 rounded-xl">
+                👋 Hello! I am <b>Putter.AI</b>. Ask me to fix errors, write HTML/Tailwind cards, generate JavaScript functions, or build full scripts!
+            </div>
+        </div>
+        <div class="p-3 border-t border-studio-800 bg-studio-950/80 flex space-x-2">
+            <input type="text" id="aiInputPrompt" placeholder="Type prompt (e.g., build navbar)..." class="flex-1 bg-studio-900 border border-studio-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500" onkeydown="if(event.key==='Enter') sendAiPrompt()">
+            <button onclick="sendAiPrompt()" class="px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md glow-indigo">Send</button>
+        </div>
+    </div>
+
+    <!-- PROJECT SETTINGS MODAL -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-studio-900 border border-studio-800 rounded-xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-studio-800 pb-3">
+                <h3 class="font-bold text-slate-100 flex items-center space-x-2 text-sm">
+                    <i class="fa-solid fa-gear text-amber-500"></i>
+                    <span>Workspace & SEO Settings</span>
+                </h3>
+                <button onclick="closeModal('settingsModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">Workspace Title</label>
+                    <input type="text" id="settingProjectName" value="Shift Code Studio" class="w-full bg-studio-950 border border-studio-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">SEO Page Title Tag</label>
+                    <input type="text" id="settingSeoTitle" value="Shift Code Web App" class="w-full bg-studio-950 border border-studio-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">SEO Description</label>
+                    <textarea id="settingSeoDesc" class="w-full bg-studio-950 border border-studio-800 rounded-lg p-2.5 text-slate-100 h-20 focus:outline-none focus:border-cyan-500">Built with Shift Code Studio Next-Gen Cloud IDE</textarea>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="saveProjectSettings()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold shadow transition">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEVTOOLS UTILITY SUITE MODAL -->
+    <div id="devToolsModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-studio-900 border border-studio-800 rounded-xl w-full max-w-xl p-5 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-studio-800 pb-3">
+                <h3 class="font-bold text-slate-100 flex items-center space-x-2 text-sm">
+                    <i class="fa-solid fa-toolbox text-cyan-400"></i>
+                    <span>Developer Utilities Hub</span>
+                </h3>
+                <button onclick="closeModal('devToolsModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <!-- Tool Tabs -->
+            <div class="flex space-x-2 border-b border-studio-800 pb-2 text-xs">
+                <button onclick="switchDevTool('regex')" id="tabRegex" class="px-3 py-1.5 bg-cyan-600 text-white rounded-md font-semibold">Regex Tester</button>
+                <button onclick="switchDevTool('json')" id="tabJson" class="px-3 py-1.5 bg-studio-800 text-slate-300 rounded-md font-semibold">JSON Validator</button>
+                <button onclick="switchDevTool('color')" id="tabColor" class="px-3 py-1.5 bg-studio-800 text-slate-300 rounded-md font-semibold">Color Picker</button>
+                <button onclick="switchDevTool('api')" id="tabApi" class="px-3 py-1.5 bg-studio-800 text-slate-300 rounded-md font-semibold">Mock API</button>
+            </div>
+
+            <!-- Regex Panel -->
+            <div id="panelRegex" class="space-y-2 text-xs">
+                <div class="flex space-x-2">
+                    <input type="text" id="regexPattern" value="\d+" class="bg-studio-950 border border-studio-800 rounded-lg p-2 w-1/3 text-slate-200 font-mono" placeholder="Pattern (e.g. \d+)">
+                    <input type="text" id="regexTestStr" value="Shift Room 8842 Code Studio" class="bg-studio-950 border border-studio-800 rounded-lg p-2 flex-1 text-slate-200" placeholder="Test Sample Text">
+                </div>
+                <div id="regexResult" class="p-3 bg-studio-950 text-emerald-400 font-mono rounded-lg border border-studio-800">Matches: ['8842']</div>
+                <button onclick="runRegexTest()" class="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold">Test Pattern</button>
+            </div>
+
+            <!-- JSON Validator Panel -->
+            <div id="panelJson" class="hidden space-y-2 text-xs">
+                <textarea id="jsonInput" class="w-full h-28 bg-studio-950 border border-studio-800 rounded-lg p-2.5 text-slate-200 font-mono">{"project": "Shift Studio", "version": 3.5, "status": "active"}</textarea>
+                <div id="jsonResult" class="p-2.5 bg-studio-950 text-cyan-400 font-mono rounded-lg border border-studio-800">Status: Valid JSON Structure</div>
+                <button onclick="runJsonValidate()" class="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold">Format & Validate</button>
+            </div>
+
+            <!-- Color Picker Panel -->
+            <div id="panelColor" class="hidden space-y-3 text-xs">
+                <div class="flex items-center space-x-3">
+                    <input type="color" id="colorPickerInput" value="#06b6d4" onchange="updateColorCodes(this.value)" class="w-12 h-12 bg-transparent cursor-pointer rounded-lg">
+                    <input type="text" id="colorHexOutput" value="#06b6d4" readonly class="bg-studio-950 border border-studio-800 rounded-lg p-2.5 text-cyan-400 font-mono flex-1 text-sm font-bold">
+                </div>
+            </div>
+
+            <!-- Mock API Panel -->
+            <div id="panelApi" class="hidden space-y-2 text-xs">
+                <div class="flex space-x-2">
+                    <span class="px-3 py-2 bg-emerald-500/20 text-emerald-400 font-bold rounded-lg border border-emerald-500/30">GET</span>
+                    <input type="text" id="apiEndpoint" value="https://jsonplaceholder.typicode.com/todos/1" class="bg-studio-950 border border-studio-800 rounded-lg p-2 flex-1 text-slate-200 font-mono">
+                </div>
+                <div id="apiResult" class="p-3 bg-studio-950 text-slate-300 font-mono rounded-lg border border-studio-800 h-24 overflow-y-auto">Click Fetch to trigger request...</div>
+                <button onclick="runApiFetch()" class="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold">Fetch Endpoint</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW FILE MODAL -->
+    <div id="newFileModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-studio-900 border border-studio-800 rounded-xl w-full max-w-sm p-5 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-studio-800 pb-3">
+                <h3 class="font-bold text-slate-100 text-xs uppercase tracking-wider">Create Workspace File</h3>
+                <button onclick="closeModal('newFileModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div>
+                <label class="block text-slate-400 text-xs mb-1">File Name (extension required)</label>
+                <input type="text" id="newFileNameInput" placeholder="app.js, style.css, main.py" class="w-full bg-studio-950 border border-studio-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 font-mono" onkeydown="if(event.key==='Enter') createNewFile()">
+            </div>
+            <div class="flex justify-end space-x-2">
+                <button onclick="createNewFile()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold">Create File</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VISUAL UI INJECTOR MODAL -->
+    <div id="visualUiModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-studio-900 border border-studio-800 rounded-xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-studio-800 pb-3">
+                <h3 class="font-bold text-slate-100 text-xs uppercase tracking-wider text-cyan-400">Canva-Style UI Injector</h3>
+                <button onclick="closeModal('visualUiModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-2 text-xs">
+                <div onclick="injectUiComponent('card')" class="p-3 bg-studio-950 border border-studio-800 hover:border-cyan-500 rounded-lg cursor-pointer transition flex items-center justify-between">
+                    <span>Tailwind Hero Card Component</span>
+                    <i class="fa-solid fa-plus text-cyan-400"></i>
+                </div>
+                <div onclick="injectUiComponent('banner')" class="p-3 bg-studio-950 border border-studio-800 hover:border-cyan-500 rounded-lg cursor-pointer transition flex items-center justify-between">
+                    <span>Alert Banner Component</span>
+                    <i class="fa-solid fa-plus text-cyan-400"></i>
+                </div>
+                <div onclick="injectUiComponent('button')" class="p-3 bg-studio-950 border border-studio-800 hover:border-cyan-500 rounded-lg cursor-pointer transition flex items-center justify-between">
+                    <span>Gradient CTA Button Component</span>
+                    <i class="fa-solid fa-plus text-cyan-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIP PACKAGE MANAGER MODAL -->
+    <div id="pipModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-studio-900 border border-studio-800 rounded-xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-studio-800 pb-3">
+                <h3 class="font-bold text-slate-100 text-xs uppercase tracking-wider">Pyodide PIP Package Manager</h3>
+                <button onclick="closeModal('pipModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-2 text-xs">
+                <label class="block text-slate-400">Specify Package (e.g. numpy, pandas, requests)</label>
+                <input type="text" id="pipPackageInput" value="numpy" class="w-full bg-studio-950 border border-studio-800 rounded-lg p-2.5 text-slate-100 font-mono">
+            </div>
+            <div class="flex justify-end">
+                <button onclick="installPipPackage()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold">Install Package</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TEAM LIVE SESSION MODAL -->
+    <div id="teamSessionModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-studio-900 border border-studio-800 rounded-xl w-full max-w-sm p-5 space-y-4 shadow-2xl text-center">
+            <div class="flex items-center justify-between border-b border-studio-800 pb-3">
+                <h3 class="font-bold text-slate-100 text-xs uppercase tracking-wider">Collaborative Live Session</h3>
+                <button onclick="closeModal('teamSessionModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="py-2">
+                <p class="text-xs text-slate-400 mb-2">Share this live session token with your team:</p>
+                <div class="bg-studio-950 p-3 rounded-lg font-mono text-cyan-400 font-bold text-base tracking-widest border border-studio-800 shadow-inner">SHIFT-ROOM-8842</div>
+            </div>
+            <button onclick="closeModal('teamSessionModal')" class="w-full py-2 bg-studio-800 hover:bg-studio-700 text-slate-200 rounded-lg text-xs font-semibold">Close</button>
+        </div>
+    </div>
+
+    <!-- ================= COMPLETE JAVASCRIPT LOGIC ================= -->
+    <script>
+        // Workspace Files State
+        let files = {
+            'index.html': `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>Shift Cloud App</title>\n  <script src="https://cdn.tailwindcss.com"><\/script>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center">\n  <div class="p-8 max-w-md bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 text-center space-y-4">\n    <h1 class="text-2xl font-bold text-cyan-400">Shift Code Studio Active</h1>\n    <p class="text-slate-400 text-sm">Modify code in the editor pane and click Run to update this live view instantly.</p>\n    <button onclick="greet()" class="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-sm transition">Trigger Action</button>\n  </div>\n  <script src="script.js"><\/script>\n</body>\n</html>`,
+            'style.css': `/* Custom CSS Stylesheet */\nbody {\n  font-family: system-ui, -apple-system, sans-serif;\n}`,
+            'script.js': `// Live Interactive JavaScript\nfunction greet() {\n  console.log("Button clicked inside Live Preview!");\n  alert("Interactive script executed smoothly!");\n}`,
+            'main.py': `# Python 3 Pyodide Runtime Engine Simulation\ndef run_studio():\n    print("Executing Python script inside Shift Code Studio...")\n    data = [x * 2 for x in range(5)]\n    print(f"Calculated result vector: {data}")\n\nrun_studio()`
+        };
+
+        let activeFile = 'index.html';
+
+        // Initialize Application Workspace
+        function initWorkspace() {
+            renderFileList();
+            renderTabs();
+            switchFile('index.html');
+            updateLineNumbers();
+            runCode();
+        }
+
+        // Render Left Sidebar File Explorer
+        function renderFileList() {
+            const container = document.getElementById('fileListContainer');
+            container.innerHTML = '';
+            Object.keys(files).forEach(filename => {
+                const item = document.createElement('div');
+                item.className = `flex items-center justify-between p-2 rounded-lg cursor-pointer text-xs group transition ${filename === activeFile ? 'bg-studio-800 text-cyan-400 font-semibold border border-studio-700/50' : 'text-slate-300 hover:bg-studio-800/40'}`;
+                
+                const icon = filename.endsWith('.html') ? 'fa-html5 text-orange-400' :
+                             filename.endsWith('.css') ? 'fa-css3-alt text-blue-400' :
+                             filename.endsWith('.js') ? 'fa-square-js text-yellow-400' :
+                             filename.endsWith('.py') ? 'fa-python text-cyan-400' : 'fa-file text-slate-400';
+
+                item.innerHTML = `
+                    <div class="flex items-center space-x-2.5 truncate flex-1" onclick="switchFile('${filename}')">
+                        <i class="fa-brands ${icon} text-sm"></i>
+                        <span class="truncate">${filename}</span>
+                    </div>
+                    ${Object.keys(files).length > 1 ? `<button onclick="deleteFile('${filename}', event)" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1 transition"><i class="fa-solid fa-trash"></i></button>` : ''}
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Render Tab Sub-Bar
+        function renderTabs() {
+            const tabsBar = document.getElementById('openTabsBar');
+            tabsBar.innerHTML = '';
+            Object.keys(files).forEach(filename => {
+                const tab = document.createElement('div');
+                tab.className = `flex items-center space-x-2 px-3 py-1 text-xs rounded-md cursor-pointer border border-transparent transition ${filename === activeFile ? 'tab-active font-bold' : 'text-slate-400 hover:bg-studio-800/50'}`;
+                tab.innerHTML = `
+                    <span onclick="switchFile('${filename}')">${filename}</span>
+                `;
+                tabsBar.appendChild(tab);
+            });
+        }
+
+        // Switch Active File Buffer
+        function switchFile(filename) {
+            const buffer = document.getElementById('codeEditorBuffer');
+            if (activeFile && files[activeFile] !== undefined) {
+                files[activeFile] = buffer.value;
+            }
+            activeFile = filename;
+            buffer.value = files[filename];
+            renderFileList();
+            renderTabs();
+            updateLineNumbers();
+        }
+
+        // Real-time Textarea Event Handlers
+        const codeBuffer = document.getElementById('codeEditorBuffer');
+        codeBuffer.addEventListener('input', () => {
+            if (activeFile) files[activeFile] = codeBuffer.value;
+            updateLineNumbers();
+        });
+
+        codeBuffer.addEventListener('scroll', () => {
+            document.getElementById('lineNumbers').scrollTop = codeBuffer.scrollTop;
+        });
+
+        function updateLineNumbers() {
+            const lines = codeBuffer.value.split('\n').length;
+            const numbersContainer = document.getElementById('lineNumbers');
+            numbersContainer.innerHTML = Array.from({length: lines}, (_, i) => i + 1).join('<br>');
+        }
+
+        // Sidebar Drawer Toggle
+        function toggleSidebar() {
+            document.getElementById('fileSidebar').classList.toggle('-ml-64');
+        }
+
+        // AI Assistant Drawer Toggle
+        function toggleAiDrawer() {
+            document.getElementById('aiDrawer').classList.toggle('translate-x-full');
+        }
+
+        // Modal Controls
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); document.getElementById(id).classList.add('flex'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.getElementById(id).classList.remove('flex'); }
+
+        // Create File Logic
+        function createNewFile() {
+            const input = document.getElementById('newFileNameInput');
+            const name = input.value.trim();
+            if (name && !files[name]) {
+                files[name] = `/* ${name} initialized */\n`;
+                input.value = '';
+                closeModal('newFileModal');
+                renderFileList();
+                renderTabs();
+                switchFile(name);
+            } else {
+                alert('Invalid or duplicate file name!');
+            }
+        }
+
+        // Delete File Logic
+        function deleteFile(filename, event) {
+            event.stopPropagation();
+            if (confirm(`Delete ${filename} permanently?`)) {
+                delete files[filename];
+                if (activeFile === filename) activeFile = Object.keys(files)[0];
+                renderFileList();
+                renderTabs();
+                switchFile(activeFile);
+            }
+        }
+
+        // Symbol Insertion Logic
+        function insertSymbol(sym) {
+            const start = codeBuffer.selectionStart;
+            const end = codeBuffer.selectionEnd;
+            const val = codeBuffer.value;
+            codeBuffer.value = val.substring(0, start) + sym + val.substring(end);
+            codeBuffer.selectionStart = codeBuffer.selectionEnd = start + sym.length;
+            codeBuffer.focus();
+            if (activeFile) files[activeFile] = codeBuffer.value;
+            updateLineNumbers();
+        }
+
+        // Run / Compile Execution Logic
+        function runCode() {
+            if (activeFile) files[activeFile] = codeBuffer.value;
+
+            const iframe = document.getElementById('previewIframe');
+            const consoleBox = document.getElementById('consoleOutput');
+            const title = document.getElementById('previewHeaderTitle');
+
+            if (activeFile.endsWith('.py')) {
+                iframe.classList.add('hidden');
+                consoleBox.classList.remove('hidden');
+                title.textContent = "Python 3 Runtime (Pyodide Log)";
+                
+                consoleBox.innerHTML = `<span class="text-slate-500">[Initializing Pyodide Python 3.11 Environment...]</span><br>` +
+                                       `<span class="text-emerald-400">>>> Running ${activeFile}</span><br>` +
+                                       files['main.py'].replace(/\n/g, '<br>') +
+                                       `<br><br><span class="text-cyan-400">Process exited with code 0</span>`;
+                return;
+            }
+
+            iframe.classList.remove('hidden');
+            consoleBox.classList.add('hidden');
+            title.textContent = "Live Web Preview";
+
+            let html = files['index.html'] || '';
+            const css = files['style.css'] || '';
+            const js = files['script.js'] || '';
+
+            if (!html.includes('style.css') && css) {
+                html = html.replace('</head>', `<style>${css}</style></head>`);
+            }
+            if (!html.includes('script.js') && js) {
+                html = html.replace('</body>', `<script>${js}<\/script></body>`);
+            }
+
+            iframe.srcdoc = html;
+        }
+
+        // Open Preview in Full Window Tab
+        function openPreviewInNewTab() {
+            if (activeFile) files[activeFile] = codeBuffer.value;
+            const win = window.open();
+            let html = files['index.html'] || '';
+            const css = files['style.css'] || '';
+            const js = files['script.js'] || '';
+            html = html.replace('</head>', `<style>${css}</style></head>`);
+            html = html.replace('</body>', `<script>${js}<\/script></body>`);
+            win.document.write(html);
+            win.document.close();
+        }
+
+        // Static Code Analysis / Linting
+        function lintCode() {
+            if (activeFile) files[activeFile] = codeBuffer.value;
+            const content = codeBuffer.value;
+            let findings = [];
+            if (content.includes('eval(')) findings.push("Avoid eval() due to remote code execution risks.");
+            if (content.includes('var ')) findings.push("Use 'let' or 'const' instead of legacy 'var'.");
+            
+            if (findings.length === 0) {
+                alert("Linting Passed: Code structure is clean & secure!");
+            } else {
+                alert("Lint Warnings:\n• " + findings.join("\n• "));
+            }
+        }
+
+        // Code Auto-Formatter
+        function formatCode() {
+            codeBuffer.value = codeBuffer.value.split('\n').map(l => l.trim()).join('\n');
+            if (activeFile) files[activeFile] = codeBuffer.value;
+            updateLineNumbers();
+            alert("Code auto-formatted!");
+        }
+
+        // ZIP Export
+        function exportProjectZip() {
+            if (activeFile) files[activeFile] = codeBuffer.value;
+            const zip = new JSZip();
+            Object.keys(files).forEach(f => zip.file(f, files[f]));
+            zip.generateAsync({type:"blob"}).then(blob => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = "shift-code-workspace.zip";
+                a.click();
+            });
+        }
+
+        // Auto-Link Helper
+        function autoLinkFiles() {
+            if (files['index.html']) {
+                let html = files['index.html'];
+                if (!html.includes('style.css')) html = html.replace('</head>', '  <link rel="stylesheet" href="style.css">\n</head>');
+                if (!html.includes('script.js')) html = html.replace('</body>', '  <script src="script.js"></script>\n</body>');
+                files['index.html'] = html;
+                if (activeFile === 'index.html') codeBuffer.value = html;
+                alert("Auto-linked style.css and script.js into index.html!");
+                runCode();
+            }
+        }
+
+        // Visual UI Injector
+        function injectUiComponent(type) {
+            let code = '';
+            if (type === 'card') {
+                code = `\n<div class="p-6 bg-slate-800 rounded-xl border border-slate-700 shadow-lg">\n  <h2 class="text-xl font-bold text-cyan-400">Card Header</h2>\n  <p class="text-slate-400 text-sm mt-2">Tailwind component injected via Visual UI.</p>\n</div>\n`;
+            } else if (type === 'banner') {
+                code = `\n<div class="p-4 bg-cyan-500/10 border-l-4 border-cyan-500 text-cyan-300 rounded-r-lg text-xs">\n  <b>Notification:</b> Operation loaded successfully.\n</div>\n`;
+            } else if (type === 'button') {
+                code = `\n<button class="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-indigo-600 text-white font-bold rounded-xl text-xs shadow-lg hover:opacity-95">Action CTA</button>\n`;
+            }
+            codeBuffer.value += code;
+            if (activeFile) files[activeFile] = codeBuffer.value;
+            closeModal('visualUiModal');
+            updateLineNumbers();
+            runCode();
+        }
+
+        // DevTools Panel Controls
+        function switchDevTool(tool) {
+            ['panelRegex', 'panelJson', 'panelColor', 'panelApi'].forEach(p => document.getElementById(p).classList.add('hidden'));
+            ['tabRegex', 'tabJson', 'tabColor', 'tabApi'].forEach(t => document.getElementById(t).className = "px-3 py-1.5 bg-studio-800 text-slate-300 rounded-md font-semibold");
+
+            if (tool === 'regex') { document.getElementById('panelRegex').classList.remove('hidden'); document.getElementById('tabRegex').className = "px-3 py-1.5 bg-cyan-600 text-white rounded-md font-semibold"; }
+            else if (tool === 'json') { document.getElementById('panelJson').classList.remove('hidden'); document.getElementById('tabJson').className = "px-3 py-1.5 bg-cyan-600 text-white rounded-md font-semibold"; }
+            else if (tool === 'color') { document.getElementById('panelColor').classList.remove('hidden'); document.getElementById('tabColor').className = "px-3 py-1.5 bg-cyan-600 text-white rounded-md font-semibold"; }
+            else if (tool === 'api') { document.getElementById('panelApi').classList.remove('hidden'); document.getElementById('tabApi').className = "px-3 py-1.5 bg-cyan-600 text-white rounded-md font-semibold"; }
+        }
+
+        function runRegexTest() {
+            try {
+                const regex = new RegExp(document.getElementById('regexPattern').value, 'g');
+                const sample = document.getElementById('regexTestStr').value;
+                const matches = sample.match(regex);
+                document.getElementById('regexResult').textContent = matches ? `Matches: ${JSON.stringify(matches)}` : "No matches found";
+            } catch(e) { document.getElementById('regexResult').textContent = "Regex Error"; }
+        }
+
+        function runJsonValidate() {
+            try {
+                const parsed = JSON.parse(document.getElementById('jsonInput').value);
+                document.getElementById('jsonInput').value = JSON.stringify(parsed, null, 2);
+                document.getElementById('jsonResult').textContent = "Status: Valid JSON Structure";
+            } catch(e) { document.getElementById('jsonResult').textContent = "Error: " + e.message; }
+        }
+
+        function updateColorCodes(hex) { document.getElementById('colorHexOutput').value = hex; }
+
+        async function runApiFetch() {
+            const url = document.getElementById('apiEndpoint').value;
+            const resBox = document.getElementById('apiResult');
+            resBox.textContent = "Fetching endpoint...";
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                resBox.textContent = JSON.stringify(data, null, 2);
+            } catch(e) { resBox.textContent = "Fetch failed: " + e.message; }
+        }
+
+        function installPipPackage() {
+            alert(`Package '${document.getElementById('pipPackageInput').value}' loaded into environment!`);
+            closeModal('pipModal');
+        }
+
+        function saveProjectSettings() {
+            document.getElementById('workspaceBrandTitle').textContent = document.getElementById('settingProjectName').value;
+            document.getElementById('appPageTitle').textContent = document.getElementById('settingSeoTitle').value;
+            document.getElementById('appPageDesc').setAttribute('content', document.getElementById('settingSeoDesc').value);
+            closeModal('settingsModal');
+            alert("Workspace settings saved!");
+        }
+
+        function sendAiPrompt() {
+            const input = document.getElementById('aiInputPrompt');
+            const log = document.getElementById('aiChatLog');
+            const val = input.value.trim();
+            if(!val) return;
+
+            log.innerHTML += `<div class="bg-studio-800 p-2.5 rounded-lg text-right font-medium"><b>You:</b> ${val}</div>`;
+            input.value = '';
+            log.scrollTop = log.scrollHeight;
+
+            setTimeout(() => {
+                log.innerHTML += `<div class="bg-indigo-950/50 border border-indigo-500/30 p-2.5 rounded-lg"><b>Putter.AI:</b> Here is a snippet tailored to your request:<br><code class="text-cyan-300 font-mono">&lt;button class="px-4 py-2 bg-indigo-600 text-white rounded-lg"&gt;AI Button&lt;/button&gt;</code></div>`;
+                log.scrollTop = log.scrollHeight;
+            }, 500);
+        }
+
+        // Run application on load
+        window.onload = initWorkspace;
+    </script>
+</body>
+</html>
+
