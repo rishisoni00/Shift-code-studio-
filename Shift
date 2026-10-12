@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shift Code Studio</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- JSZip CDN for Export Zip Feature -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        /* Custom scrollbar and pane styling */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        body { background-color: #0f172a; color: #f8fafc; font-family: ui-sans-serif, system-ui, sans-serif; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- 1. TOP HEADER NAVIGATION BAR -->
+    <header class="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 z-20 shrink-0">
+        <div class="flex items-center space-x-3">
+            <button id="sidebarToggleBtn" title="Sidebar Toggle" class="p-2 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <div class="flex items-center space-x-2 font-bold text-lg tracking-wide text-cyan-400">
+                <i class="fa-solid fa-code"></i>
+                <span>Shift Code Studio</span>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <!-- Project Settings Coin Button -->
+            <button onclick="openModal('settingsModal')" class="flex items-center space-x-1 px-3 py-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 rounded-md hover:bg-amber-500/30 transition text-sm font-semibold">
+                <span>₹1</span>
+                <span class="hidden sm:inline">Settings</span>
+            </button>
+            <!-- DevTools Button -->
+            <button onclick="openModal('devToolsModal')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md text-sm transition font-medium">
+                DevTools
+            </button>
+            <!-- Run / Compile Button -->
+            <button id="runBtn" onclick="runCode()" class="flex items-center space-x-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md text-sm font-semibold shadow transition">
+                <i class="fa-solid fa-play text-xs"></i>
+                <span>Run</span>
+            </button>
+            <!-- AI Assistant Button -->
+            <button onclick="toggleAiDrawer()" class="flex items-center space-x-1 px-3 py-1.5 bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/30 rounded-md text-sm transition">
+                <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+                <span class="hidden md:inline">AI Assistant</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE CONTAINER -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- 2. LEFT SIDEBAR (WORKSPACE FILE EXPLORER) -->
+        <aside id="fileSidebar" class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-10 transition-all duration-300">
+            <div class="p-3 border-b border-slate-800 flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Explorer</span>
+                <div class="flex items-center space-x-1">
+                    <button onclick="openModal('newFileModal')" title="New File" class="p-1.5 hover:bg-slate-800 rounded text-slate-300 hover:text-white"><i class="fa-solid fa-file-circle-plus"></i></button>
+                    <button onclick="toggleSidebar()" title="Close Sidebar" class="p-1.5 hover:bg-slate-800 rounded text-slate-300 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <!-- File List Tree -->
+            <div id="fileListContainer" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <!-- Dynamically populated files -->
+            </div>
+
+            <!-- Sidebar Footer Controls -->
+            <div class="p-3 border-t border-slate-800 space-y-2 bg-slate-950/40">
+                <button onclick="openPipModal()" class="w-full flex items-center justify-center space-x-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded text-slate-200 transition">
+                    <i class="fa-solid fa-box-archive"></i>
+                    <span>PIP Package Manager</span>
+                </button>
+                <button onclick="exportProjectZip()" class="w-full flex items-center justify-center space-x-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded text-slate-200 transition">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Export Zip</span>
+                </button>
+                <button onclick="openModal('teamSessionModal')" class="w-full flex items-center justify-center space-x-2 py-1.5 bg-cyan-600/20 border border-cyan-500/30 hover:bg-cyan-600/30 text-xs rounded text-cyan-300 transition">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Team Live Session</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- CENTER & RIGHT: EDITOR & PREVIEW PANES -->
+        <main class="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-950">
+
+            <!-- CODE EDITOR PANE -->
+            <div class="flex-1 flex flex-col border-r border-slate-800 overflow-hidden">
+                <!-- 3. EDITOR SUB-BAR (CODE PANE HEADER) -->
+                <div class="h-10 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-3 shrink-0">
+                    <div id="activeFileName" class="text-xs font-mono text-cyan-400 font-semibold">index.html</div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="lintCode()" title="Lint Code" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 rounded flex items-center space-x-1">
+                            <i class="fa-solid fa-shield-halved text-amber-400"></i>
+                            <span>Lint</span>
+                        </button>
+                        <button onclick="formatCode()" title="Format Code" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 rounded flex items-center space-x-1">
+                            <i class="fa-solid fa-wand-magic text-cyan-400"></i>
+                            <span>Format</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Textarea Code Buffer -->
+                <div class="flex-1 relative flex flex-col">
+                    <textarea id="codeEditorBuffer" class="flex-1 bg-slate-950 text-slate-100 p-4 font-mono text-sm resize-none focus:outline-none leading-relaxed" spellcheck="false" placeholder="Select or create a file to start coding..."></textarea>
+                    
+                    <!-- 4. MOBILE QUICK-SYMBOL KEYBOARD ACCESSORY BAR -->
+                    <div class="bg-slate-900 border-t border-slate-800 flex items-center overflow-x-auto px-2 py-1.5 space-x-1 shrink-0 text-xs">
+                        <button onclick="insertSymbol('&lt;')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono">&lt;</button>
+                        <button onclick="insertSymbol('&gt;')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono">&gt;</button>
+                        <button onclick="insertSymbol('/')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono">/</button>
+                        <button onclick="insertSymbol('=')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono">=</button>
+                        <button onclick="insertSymbol('&quot;')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono">"</button>
+                        <button onclick="insertSymbol('{')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono">{</button>
+                        <button onclick="insertSymbol('}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono">}</button>
+                        <button onclick="insertSymbol(';')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono">;</button>
+                        <button onclick="insertSymbol('$')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono">$</button>
+                        <button onclick="insertSymbol('() => {}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono text-cyan-400">=&gt;</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LIVE PREVIEW & OUTPUT PANE -->
+            <div class="w-full md:w-1/2 flex flex-col bg-slate-900 h-64 md:h-auto border-t md:border-t-0 border-slate-800">
+                <!-- 5. LIVE PREVIEW & CONSOLE HEADER BAR -->
+                <div class="h-10 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-3 shrink-0">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Live Preview / Output</span>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="runCode()" title="Refresh Preview" class="p-1.5 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                        </button>
+                        <button onclick="openPreviewInNewTab()" title="Open in New Tab" class="p-1.5 hover:bg-slate-800 rounded text-slate-300 hover:text-white transition">
+                            <i class="fa-solid fa-up-right-from-square"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex-1 bg-white relative flex flex-col">
+                    <iframe id="previewIframe" class="w-full h-full border-0"></iframe>
+                    <div id="consoleOutput" class="hidden absolute inset-0 bg-slate-950 text-emerald-400 font-mono text-xs p-4 overflow-y-auto"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 6. MOBILE BOTTOM NAVIGATION BAR (Visible on mobile viewports) -->
+    <nav class="md:hidden h-14 bg-slate-900 border-t border-slate-800 flex items-center justify-around px-2 z-20 shrink-0 text-xs text-slate-300">
+        <button onclick="toggleSidebar()" class="flex flex-col items-center space-y-1 hover:text-white">
+            <i class="fa-solid fa-folder-open text-base"></i>
+            <span>Files</span>
+        </button>
+        <button onclick="openModal('devToolsModal')" class="flex flex-col items-center space-y-1 hover:text-white">
+            <i class="fa-solid fa-toolbox text-base"></i>
+            <span>Tools</span>
+        </button>
+        <button onclick="openModal('visualUiModal')" class="flex flex-col items-center space-y-1 hover:text-white">
+            <i class="fa-solid fa-palette text-base text-cyan-400"></i>
+            <span>Visual UI</span>
+        </button>
+        <button onclick="autoLinkFiles()" class="flex flex-col items-center space-y-1 hover:text-white">
+            <i class="fa-solid fa-link text-base text-amber-400"></i>
+            <span>Auto-Link</span>
+        </button>
+    </nav>
+
+    <!-- ================= MODALS & DRAWERS ================= -->
+
+    <!-- AI Assistant Drawer / Modal -->
+    <div id="aiDrawer" class="fixed inset-y-0 right-0 w-80 bg-slate-900 border-l border-slate-800 transform translate-x-full transition-transform duration-300 z-50 flex flex-col shadow-2xl">
+        <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+            <div class="flex items-center space-x-2 text-indigo-400 font-bold">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Putter.AI Companion</span>
+            </div>
+            <button onclick="toggleAiDrawer()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="aiChatLog" class="flex-1 p-3 overflow-y-auto space-y-3 text-xs text-slate-300">
+            <div class="bg-indigo-950/50 border border-indigo-500/30 p-2.5 rounded">
+                Hello! I am Putter.AI. How can I help you generate code or debug your scripts today?
+            </div>
+        </div>
+        <div class="p-3 border-t border-slate-800 bg-slate-950 flex space-x-2">
+            <input type="text" id="aiInputPrompt" placeholder="Ask AI to write code..." class="flex-1 bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            <button onclick="sendAiPrompt()" class="px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs">Send</button>
+        </div>
+    </div>
+
+    <!-- Project Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-md p-5 space-y-4 shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-slate-100 flex items-center space-x-2">
+                    <i class="fa-solid fa-gear text-amber-500"></i>
+                    <span>Project Settings</span>
+                </h3>
+                <button onclick="closeModal('settingsModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">Workspace Name</label>
+                    <input type="text" id="settingProjectName" value="My Shift App" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">SEO Title Tag</label>
+                    <input type="text" id="settingSeoTitle" value="Shift Code Studio App" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">SEO Description</label>
+                    <textarea id="settingSeoDesc" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 h-20 focus:outline-none">Built with Shift Code Studio</textarea>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeModal('settingsModal')" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DevTools Modal -->
+    <div id="devToolsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-xl p-5 space-y-4 shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-slate-100 flex items-center space-x-2">
+                    <i class="fa-solid fa-toolbox text-cyan-400"></i>
+                    <span>Developer Utilities Hub</span>
+                </h3>
+                <button onclick="closeModal('devToolsModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+                <div onclick="alert('Regex Tester utility opened!')" class="p-3 bg-slate-950 border border-slate-800 rounded cursor-pointer hover:border-cyan-500 transition">
+                    <div class="font-semibold text-cyan-400 mb-1"><i class="fa-solid fa-code"></i> Regex Tester</div>
+                    <div class="text-slate-400">Test regular expressions against raw text samples instantly.</div>
+                </div>
+                <div onclick="alert('JSON Validator utility opened!')" class="p-3 bg-slate-950 border border-slate-800 rounded cursor-pointer hover:border-cyan-500 transition">
+                    <div class="font-semibold text-cyan-400 mb-1"><i class="fa-solid fa-brackets-curly"></i> JSON Validator</div>
+                    <div class="text-slate-400">Parse, format and validate JSON syntax structures.</div>
+                </div>
+                <div onclick="alert('Color Picker utility opened!')" class="p-3 bg-slate-950 border border-slate-800 rounded cursor-pointer hover:border-cyan-500 transition">
+                    <div class="font-semibold text-cyan-400 mb-1"><i class="fa-solid fa-palette"></i> Color Picker</div>
+                    <div class="text-slate-400">Extract HEX, RGB, and Tailwind palette codes.</div>
+                </div>
+                <div onclick="alert('Mock API REST Client utility opened!')" class="p-3 bg-slate-950 border border-slate-800 rounded cursor-pointer hover:border-cyan-500 transition">
+                    <div class="font-semibold text-cyan-400 mb-1"><i class="fa-solid fa-network-wired"></i> Mock API REST Client</div>
+                    <div class="text-slate-400">Trigger test GET/POST payload requests.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New File Modal -->
+    <div id="newFileModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-sm p-5 space-y-4 shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-slate-100 text-xs uppercase">Create New Project File</h3>
+                <button onclick="closeModal('newFileModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div>
+                <label class="block text-slate-400 text-xs mb-1">File Name (e.g., script.js, style.css, app.py)</label>
+                <input type="text" id="newFileNameInput" placeholder="script.js" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs text-slate-200 focus:outline-none">
+            </div>
+            <div class="flex justify-end space-x-2">
+                <button onclick="createNewFile()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs">Create File</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visual UI Modal -->
+    <div id="visualUiModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-lg w-full max-w-md p-5 space-y-4 shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-slate-100 text-xs uppercase text-cyan-400">Canva-Style UI Component Injector</h3>
+                <button onclick="closeModal('visualUiModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-2 text-xs">
+                <div onclick="injectUiComponent('card')" class="p-2.5 bg-slate-950 border border-slate-800 hover:border-cyan-500 rounded cu
